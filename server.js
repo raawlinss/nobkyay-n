@@ -362,8 +362,7 @@ function setupWebSocket(server) {
       if (ws.readyState === 1) ws.send(msg);
     });
   }, 3000);
-
-  // RTMP Tunnel
+  // RTMP Tunnel WebSocket Server
   const net = require("net");
   const rtmpWss = new WebSocketServer({ server, path: "/rtmp-tunnel" });
   
