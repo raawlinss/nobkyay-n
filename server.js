@@ -337,8 +337,9 @@ async function serveStatic(req, res, pathname) {
 
 /* ─── WebSocket for chat presence & stream events ─── */
 function setupWebSocket(server) {
-  const wss = new WebSocketServer({ server, path: "/ws" });
-  
+  const wss = new WebSocketServer({ noServer: true });
+  const rtmpWss = new WebSocketServer({ noServer: true });
+
   wss.on("connection", (ws) => {
     ws.isAlive = true;
     ws.on("pong", () => { ws.isAlive = true; });
@@ -362,20 +363,10 @@ function setupWebSocket(server) {
       if (ws.readyState === 1) ws.send(msg);
     });
   }, 3000);
-  // RTMP Tunnel WebSocket Server
+
   const net = require("net");
-  const rtmpWss = new WebSocketServer({ server, path: "/rtmp-tunnel" });
   
   rtmpWss.on("connection", (ws, req) => {
-    const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
-    const key = url.searchParams.get("key");
-    
-    if (key !== streamKey) {
-      console.warn("RTMP Tunnel rejected: Invalid key");
-      ws.close(1008, "Invalid key");
-      return;
-    }
-
     console.log("RTMP Tunnel connected from OBS");
     const rtmpSocket = net.createConnection({ host: "127.0.0.1", port: 1935 }, () => {
       console.log("RTMP Tunnel established to MediaMTX");
@@ -402,6 +393,30 @@ function setupWebSocket(server) {
       console.error("RTMP local error:", err.message);
       ws.close();
     });
+  });
+
+  server.on("upgrade", (req, socket, head) => {
+    const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
+    const pathname = url.pathname;
+
+    if (pathname === "/ws") {
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        wss.emit("connection", ws, req);
+      });
+    } else if (pathname === "/rtmp-tunnel") {
+      const key = url.searchParams.get("key");
+      if (key !== streamKey) {
+        console.warn("RTMP Tunnel rejected: Invalid key");
+        socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+        socket.destroy();
+        return;
+      }
+      rtmpWss.handleUpgrade(req, socket, head, (ws) => {
+        rtmpWss.emit("connection", ws, req);
+      });
+    } else {
+      socket.destroy();
+    }
   });
 }
 
