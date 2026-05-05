@@ -10,9 +10,10 @@ const path = require("path");
 const { WebSocketServer } = require("ws");
 
 const PORT = Number.parseInt(process.env.PORT || "7860", 10);
-const MEDIAMTX_WEBRTC = "127.0.0.1:8889";
+const MEDIAMTX_WEBRTC = process.env.STREAM_ORIGIN ? `${new URL(process.env.STREAM_ORIGIN).hostname}:8889` : "127.0.0.1:8889";
+const MEDIAMTX_HLS_BASE = process.env.STREAM_ORIGIN || null; // e.g. https://xxx.trycloudflare.com
 const MEDIAMTX_HLS = "127.0.0.1:8888";
-const MEDIAMTX_API = "127.0.0.1:9997";
+const MEDIAMTX_API = process.env.STREAM_ORIGIN ? `${new URL(process.env.STREAM_ORIGIN).hostname}:9997` : "127.0.0.1:9997";
 const CHAT_LIMIT = 50;
 const PUBLIC_DIR = path.join(__dirname, "public");
 
@@ -276,8 +277,13 @@ function proxyToMediaMtx(req, res, targetHost, targetPath) {
 
 /* ─── Stream Status Check ─── */
 async function checkStreamStatus() {
+  // If using external stream origin, check it via HTTP API
+  const apiHost = MEDIAMTX_HLS_BASE
+    ? `${new URL(MEDIAMTX_HLS_BASE).hostname}:9997`
+    : "127.0.0.1:9997";
+
   return new Promise((resolve) => {
-    const req = http.get(`http://${MEDIAMTX_API}/v3/paths/list`, (res) => {
+    const req = http.get(`http://${apiHost}/v3/paths/list`, (res) => {
       let data = "";
       res.on("data", chunk => data += chunk);
       res.on("end", () => {
@@ -450,6 +456,7 @@ const server = http.createServer(async (req, res) => {
       viewerCount: sseClients.size,
       broadcasterOnline: status.online,
       readers: status.readers,
+      hlsOrigin: MEDIAMTX_HLS_BASE || null, // null = use same server
     });
     return;
   }

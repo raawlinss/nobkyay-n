@@ -4,14 +4,15 @@
 const S = {
   role: null,
   ws: null,
-  pc: null,           // WHEP peer connection
-  hls: null,          // HLS.js instance
-  mode: "webrtc",     // "webrtc" | "hls"
+  pc: null,
+  hls: null,
+  mode: "hls",
   nick: localStorage.getItem("nobk_nick") || "",
   liveAt: null,
   streamKey: null,
   isLive: false,
   retryTimer: null,
+  hlsOrigin: null,   // populated from /api/config
 };
 
 /* ─── DOM ─── */
@@ -231,12 +232,14 @@ function stopPlayback() {
   if (S.retryTimer) { clearTimeout(S.retryTimer); S.retryTimer = null; }
 }
 
-/* ─── HLS Viewer (smooth, buffered) ─── */
+/* ─── HLS Viewer ─── */
 function connectHLS() {
   if (S.hls) { S.hls.destroy(); S.hls = null; }
   setStatus("HLS yükleniyor...");
 
-  const hlsUrl = "/live/index.m3u8";
+  // Use external origin (Cloudflare tunnel) if set, otherwise use same server
+  const hlsBase = S.hlsOrigin ? S.hlsOrigin : "";
+  const hlsUrl = `${hlsBase}/live/index.m3u8`;
 
   if (typeof Hls !== "undefined" && Hls.isSupported()) {
     const hls = new Hls({
@@ -326,6 +329,12 @@ async function pollStreamStatus() {
     const d = await r.json();
     const wasLive = S.isLive;
     S.isLive = d.broadcasterOnline;
+
+    // Store external HLS origin (Cloudflare tunnel URL) if provided
+    if (d.hlsOrigin && d.hlsOrigin !== S.hlsOrigin) {
+      S.hlsOrigin = d.hlsOrigin;
+      console.log("[HLS] Origin set to:", S.hlsOrigin);
+    }
 
     if (S.isLive && !wasLive) {
       startPlayback();
