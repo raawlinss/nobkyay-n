@@ -1,0 +1,81 @@
+###############################################
+# Nobk Live - MediaMTX configuration
+# OBS WHIP ingest → WHEP playback via Node.js proxy.
+
+logLevel: debug
+logDestinations: [stdout]
+readTimeout: 10s
+writeTimeout: 10s
+writeQueueSize: 512
+udpMaxPayloadSize: 1200
+
+###############################################
+# Authentication is delegated to the Node app on port 7860.
+# Read is public; publish requires STREAM_KEY via query param.
+
+authMethod: http
+authHTTPAddress: http://127.0.0.1:7860/api/mediamtx/auth
+authHTTPExclude:
+  - action: api
+  - action: metrics
+  - action: pprof
+
+###############################################
+# Disable unused ingest protocols.
+
+rtsp: false
+rtmp: true
+rtmpAddress: :1935
+srt: false
+
+###############################################
+# Low-latency HLS fallback.
+
+hls: true
+hlsAddress: 0.0.0.0:8888
+hlsAlwaysRemux: true
+hlsVariant: lowLatency
+hlsSegmentCount: 7
+hlsSegmentDuration: 500ms
+hlsPartDuration: 100ms
+hlsSegmentMaxSize: 20M
+hlsMuxerCloseAfter: 10s
+
+###############################################
+# WebRTC / WHIP / WHEP.
+webrtc: true
+webrtcAddress: :8889
+webrtcTrustedProxies: ['0.0.0.0', '::1', '10.0.0.0/8', '172.16.0.0/12']
+webrtcLocalUDPAddress: :8189
+webrtcLocalTCPAddress: :8189
+webrtcIPsFromInterfaces: false
+webrtcIPsFromInterfacesList: []
+webrtcAdditionalHosts: ['127.0.0.1']
+webrtcHandshakeTimeout: 30s
+webrtcTrackGatherTimeout: 8s
+webrtcSTUNGatherTimeout: 10s
+webrtcICEServers2:
+  - url: stun:stun.l.google.com:19302
+  - url: stun:stun1.l.google.com:19302
+  - url: stun:stun2.l.google.com:19302
+  - url: turn:openrelay.metered.ca:80
+    username: openrelayproject
+    password: openrelayproject
+  - url: turn:openrelay.metered.ca:443?transport=tcp
+    username: openrelayproject
+    password: openrelayproject
+
+###############################################
+# Local API for health/status.
+
+api: true
+apiAddress: 0.0.0.0:9997
+
+###############################################
+# The public stream path. OBS publishes to /live/whip.
+# ?key=STREAM_KEY is passed as query and validated by auth webhook.
+
+paths:
+  live:
+    source: publisher
+    maxReaders: 0

@@ -1,0 +1,16 @@
+{
+  "name": "nobkfilm-live",
+  "version": "2.0.0",
+  "description": "NOBKFİLM browser-based screen share live streaming",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

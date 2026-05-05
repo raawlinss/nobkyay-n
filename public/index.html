@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0e0e10" />
+    <meta name="description" content="NOBKFİLM Canlı Yayın - OBS ile profesyonel canlı yayın platformu" />
+    <title>NOBKFİLM Live</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css?v=8" />
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
+    <script defer src="/app.js?v=8"></script>
+  </head>
+  <body>
+    <main class="app-shell" id="appShell">
+      <!-- ─── Main Column ─── -->
+      <section class="main-column" aria-label="Yayın">
+        <section class="player-shell" id="playerShell">
+          <!-- Video player for WHEP stream -->
+          <video id="viewerVideo" autoplay playsinline></video>
+
+          <div class="player-top">
+            <button class="audience-button" type="button">
+              <span>Belli izleyici gruplarına yöneliktir.</span>
+              <span class="chevron">⌄</span>
+            </button>
+            <div class="player-badges">
+              <span id="livePill" class="live-pill">CANLI</span>
+              <span class="latency-pill" id="modePill">WebRTC</span>
+            </div>
+          </div>
+
+          <div id="emptyState" class="empty-state">
+            <div class="signal-rings"><span></span><span></span><span></span></div>
+            <strong>Yayın bekleniyor</strong>
+            <span id="emptySubtext">Bağlantı hazır</span>
+          </div>
+
+          <div class="player-bottom">
+            <div class="player-left-actions">
+              <button id="muteButton" class="icon-button" type="button" aria-label="Sesi aç veya kapat">🔇</button>
+            </div>
+            <div class="player-right-actions">
+              <span id="connectionStatus" class="connection-status">Hazırlanıyor</span>
+              <button id="cinemaButton" class="icon-button" type="button" aria-label="Sinema Modu">🍿</button>
+              <button id="fullscreenButton" class="icon-button" type="button" aria-label="Tam ekran">⛶</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="channel-bar" aria-label="Kanal bilgisi">
+          <div class="channel-left">
+            <div class="avatar-frame">
+              <img class="avatar" src="/profil%20fotosu.png" onerror="this.onerror=null;this.src='/avatar.svg'" alt="" />
+              <span class="avatar-live" id="avatarLive">CANLI</span>
+            </div>
+            <div class="channel-copy">
+              <div class="channel-name">
+                <span>NOBKFİLM</span>
+                <span class="verified">✓</span>
+              </div>
+              <div class="stream-title">YAYINIMA HOŞGELDİNİZ</div>
+              <div class="meta-row">
+                <span>OBS Studio</span>
+                <span class="lang-pill">Türkçe</span>
+                <span class="mode-pill" id="qualityPill">Bağlanıyor...</span>
+              </div>
+            </div>
+          </div>
+          <div class="channel-actions">
+            <button class="primary-button" type="button">☆ Abone Ol</button>
+            <div class="stream-stats">
+              <span class="viewer-dot"></span>
+              <span id="viewerCount">0</span>
+              <span id="liveTimer">00:00</span>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <!-- ─── Chat Panel ─── -->
+      <aside class="chat-panel" aria-label="Yayın Sohbeti">
+        <iframe id="twitchChatFrame" class="twitch-chat-frame" frameborder="0" scrolling="no" allowfullscreen></iframe>
+      </aside>
+    </main>
+
+    <!-- ─── Admin Panel (only visible to admin) ─── -->
+    <div id="adminOverlay" class="broadcaster-overlay" hidden>
+      <div class="source-panel" id="sourcePanel">
+        <div class="source-panel-header" id="panelDragHandle">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="cursor: move; color: var(--muted);">⠿</span>
+            <h3>📡 Yayın Kontrol</h3>
+          </div>
+          <div class="source-panel-actions">
+            <button id="minimizePanelBtn" class="source-btn" type="button" title="Küçült/Büyüt" style="font-weight: 900;">_</button>
+          </div>
+        </div>
+        <div id="panelBody">
+          <!-- Stream status -->
+          <div class="admin-status-section">
+            <div class="admin-status-row">
+              <span class="admin-label">Durum</span>
+              <span id="adminStreamStatus" class="admin-value status-offline">● Çevrimdışı</span>
+            </div>
+            <div class="admin-status-row">
+              <span class="admin-label">İzleyici</span>
+              <span id="adminViewerCount" class="admin-value">0</span>
+            </div>
+            <div class="admin-status-row">
+              <span class="admin-label">Kalite</span>
+              <span id="adminQuality" class="admin-value">—</span>
+            </div>
+          </div>
+
+          <!-- OBS Settings -->
+          <div class="admin-obs-section">
+            <div class="admin-section-title">OBS Ayarları</div>
+            <div class="admin-field">
+              <label>WHIP URL</label>
+              <div class="admin-copy-field">
+                <input id="whipUrlField" type="text" readonly />
+                <button id="copyWhipUrl" class="source-btn" type="button" title="Kopyala">📋</button>
+              </div>
+            </div>
+            <div class="admin-field">
+              <label>Stream Key</label>
+              <div class="admin-copy-field">
+                <input id="streamKeyField" type="password" readonly />
+                <button id="copyStreamKey" class="source-btn" type="button" title="Kopyala">📋</button>
+                <button id="toggleKeyVisibility" class="source-btn" type="button" title="Göster/Gizle">👁️</button>
+              </div>
+            </div>
+            <div class="admin-help">
+              OBS → Ayarlar → Yayın → Hizmet: <strong>WHIP</strong><br>
+              Sunucu: yukarıdaki WHIP URL<br>
+              Bearer Token: Stream Key
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── Nick Gate ─── -->
+    <section id="nickGate" class="nick-gate" aria-label="Nick seçimi">
+      <form id="nickForm" class="nick-dialog">
+        <div class="nick-mark">N</div>
+        <h1>Yayına Katıl</h1>
+        <p>Sohbete girmek için bir nick seç.</p>
+        <input id="nickInput" type="text" maxlength="24" autocomplete="nickname" placeholder="Nick" />
+        <button type="submit">Devam Et</button>
+      </form>
+    </section>
+
+    <!-- ─── Stream Key Gate (for NOBK-RAW) ─── -->
+    <section id="streamKeyGate" class="stream-key-gate" hidden>
+      <form id="streamKeyForm" class="stream-key-dialog">
+        <div class="key-icon">🔑</div>
+        <h1>NOBK-RAW</h1>
+        <p>Yayın anahtarınızı girin</p>
+        <input id="streamKeyInput" type="password" autocomplete="off" placeholder="Stream Key" />
+        <button type="submit">Admin Paneli Aç</button>
+        <span id="keyError" class="key-error" hidden>Geçersiz anahtar</span>
+      </form>
+    </section>
+  </body>
+</html>
