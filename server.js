@@ -269,13 +269,13 @@ function proxyToMediaMtx(req, res, targetHost, targetPath) {
         "access-control-allow-origin": "*",
         "access-control-allow-methods": "GET,POST,PATCH,DELETE,OPTIONS",
         "access-control-allow-headers": "Content-Type, Authorization, If-Match",
-        "access-control-expose-headers": "Location, ETag, Link, Content-Type",
+        "access-control-expose-headers": "Location, ETag, Link, Content-Type, Accept-Patch, Allow",
       };
 
       // Forward important response headers from MediaMTX
       const copyHeaders = [
         "content-type", "location", "etag", "link",
-        "accept-patch", "content-length"
+        "accept-patch", "allow", "content-length"
       ];
       for (const h of copyHeaders) {
         if (proxyRes.headers[h]) {
