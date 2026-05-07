@@ -519,19 +519,38 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ── WHIP proxy (OBS publishes here) ──
-  const isWhipPath = pathname.endsWith("/whip") || pathname.includes("/whip/");
-  const isWhepPath = pathname.endsWith("/whep") || pathname.includes("/whep/");
-  const isHlsPath = /\.(m3u8|mp4|m4s|ts)$/i.test(pathname) || pathname.includes("_HLS_");
+  // ── Stream Proxy (WHIP/WHEP/HLS) ──
+  if (pathname.startsWith("/live/")) {
+    const isWhip = pathname.endsWith("/whip") || pathname.includes("/whip/");
+    const isWhep = pathname.endsWith("/whep") || pathname.includes("/whep/");
+    const isHlsPath = /\.(m3u8|mp4|m4s|ts)$/i.test(pathname) || pathname.includes("_HLS_");
+    
+    // GET/HEAD -> HLS or Status Page
+    if (req.method === "GET" || req.method === "HEAD") {
+      if (isHlsPath) {
+        proxyToMediaMtx(req, res, MEDIAMTX_HLS, pathname + requestUrl.search);
+      } else if (isWhip || isWhep) {
+        json(res, 200, {
+          status: "active",
+          service: isWhip ? "WHIP Ingest" : "WHEP Playback",
+          message: "Endpoint is active. Use a compatible client (like OBS or a WebRTC player).",
+          path: pathname
+        });
+      } else {
+        notFound(res);
+      }
+      return;
+    }
 
-  if (isWhipPath) {
-    proxyToMediaMtx(req, res, MEDIAMTX_WEBRTC, pathname + requestUrl.search);
-    return;
-  }
+    // POST/PATCH/DELETE/OPTIONS -> WebRTC (WHIP/WHEP)
+    // Strip /whip or /whep suffixes for the initial request to match MediaMTX paths
+    let targetPath = pathname;
+    if (pathname.endsWith("/whip")) targetPath = pathname.slice(0, -5);
+    else if (pathname.endsWith("/whep")) targetPath = pathname.slice(0, -5);
+    else if (pathname.includes("/whip/")) targetPath = pathname.replace("/whip/", "/");
+    else if (pathname.includes("/whep/")) targetPath = pathname.replace("/whep/", "/");
 
-  // ── WHEP proxy (viewers connect here) ──
-  if (isWhepPath) {
-    proxyToMediaMtx(req, res, MEDIAMTX_WEBRTC, pathname + requestUrl.search);
+    proxyToMediaMtx(req, res, MEDIAMTX_WEBRTC, targetPath + requestUrl.search);
     return;
   }
 

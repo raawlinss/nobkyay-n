@@ -79,6 +79,6 @@ paths:
   live:
     source: publisher
     maxReaders: 0
-  all_others:
+  # Allow any path as a publisher
+  all:
     source: publisher
-    maxReaders: 0
