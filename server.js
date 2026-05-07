@@ -19,6 +19,7 @@ const MEDIAMTX_API = `${MEDIAMTX_HOST}:9997`;
 const PUBLIC_HLS_ORIGIN = (process.env.PUBLIC_HLS_ORIGIN || "").trim() || null;
 const CHAT_LIMIT = 50;
 const PUBLIC_DIR = path.join(__dirname, "public");
+const DEFAULT_STREAM_PATH = "live";
 
 let streamKey = (process.env.STREAM_KEY || "NOBK-RAW").trim();
 if (!streamKey) {
@@ -103,6 +104,11 @@ function maskSecret(v) {
   const s = String(v || "");
   if (s.length <= 8) return "****";
   return `${s.slice(0, 4)}...${s.slice(-4)}`;
+}
+
+function isLocalAddress(ip) {
+  const s = String(ip || "").toLowerCase();
+  return s === "127.0.0.1" || s === "::1" || s === "::ffff:127.0.0.1" || s.startsWith("127.");
 }
 
 /* ─── Chat ─── */
@@ -204,8 +210,8 @@ function handleMediaMtxAuth(req, res) {
       if (cleanedKey.startsWith("?key=")) cleanedKey = cleanedKey.replace("?key=", "");
       if (cleanedKey.includes("/")) cleanedKey = cleanedKey.split("/")[0];
       
-      // If publisher is localhost, allow it unconditionally to avoid path mismatches in OBS
-      if (body.ip === "127.0.0.1" || body.ip === "::1" || cleanedKey === streamKey) {
+      // RTMP is only reached through the authenticated /rtmp-tunnel inside this container.
+      if (body.protocol === "rtmp" || isLocalAddress(body.ip) || cleanedKey === streamKey) {
         console.log("MediaMTX: publish authorized for path:", body.path);
         json(res, 200, { ok: true });
       } else {
@@ -309,17 +315,20 @@ async function checkStreamStatus() {
       res.on("end", () => {
         try {
           const parsed = JSON.parse(data);
-          const livePath = parsed.items?.find(p => p.name === "live");
+          const paths = Array.isArray(parsed.items) ? parsed.items : [];
+          const readyPaths = paths.filter(p => p.ready === true);
+          const livePath = readyPaths.find(p => p.name === DEFAULT_STREAM_PATH) || readyPaths[0] || paths.find(p => p.name === DEFAULT_STREAM_PATH);
           resolve({
             online: livePath?.ready === true,
             readers: livePath?.readers?.length || 0,
             source: livePath?.source?.type || null,
+            path: livePath?.name || DEFAULT_STREAM_PATH,
           });
-        } catch { resolve({ online: false, readers: 0, source: null }); }
+        } catch { resolve({ online: false, readers: 0, source: null, path: DEFAULT_STREAM_PATH }); }
       });
     });
-    req.on("error", () => resolve({ online: false, readers: 0, source: null }));
-    req.setTimeout(2000, () => { req.destroy(); resolve({ online: false, readers: 0, source: null }); });
+    req.on("error", () => resolve({ online: false, readers: 0, source: null, path: DEFAULT_STREAM_PATH }));
+    req.setTimeout(2000, () => { req.destroy(); resolve({ online: false, readers: 0, source: null, path: DEFAULT_STREAM_PATH }); });
   });
 }
 
@@ -498,6 +507,7 @@ const server = http.createServer(async (req, res) => {
       viewerCount: sseClients.size,
       broadcasterOnline: status.online,
       readers: status.readers,
+      streamPath: status.path || DEFAULT_STREAM_PATH,
       hlsOrigin: PUBLIC_HLS_ORIGIN,
       playback: { primary: "webrtc", fallback: "hls" },
     });
@@ -505,13 +515,17 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ── WHIP proxy (OBS publishes here) ──
-  if (pathname === "/live/whip" || pathname === "/live/whip/") {
+  const isWhipPath = pathname.endsWith("/whip") || pathname.includes("/whip/");
+  const isWhepPath = pathname.endsWith("/whep") || pathname.includes("/whep/");
+  const isHlsPath = /\.(m3u8|mp4|m4s|ts)$/i.test(pathname) || pathname.includes("_HLS_");
+
+  if (isWhipPath) {
     proxyToMediaMtx(req, res, MEDIAMTX_WEBRTC, pathname + requestUrl.search);
     return;
   }
 
   // ── WHEP proxy (viewers connect here) ──
-  if (pathname === "/live/whep" || pathname === "/live/whep/") {
+  if (isWhepPath) {
     proxyToMediaMtx(req, res, MEDIAMTX_WEBRTC, pathname + requestUrl.search);
     return;
   }
@@ -523,7 +537,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ── HLS proxy (all other /live/ paths: .m3u8, .ts, .mp4, .m4s, etc.) ──
-  if (pathname.startsWith("/live/") && !pathname.includes("/whip") && !pathname.includes("/whep")) {
+  if (isHlsPath && !isWhipPath && !isWhepPath) {
     proxyToMediaMtx(req, res, MEDIAMTX_HLS, pathname + requestUrl.search);
     return;
   }

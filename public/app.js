@@ -15,6 +15,7 @@ const S = {
   hlsOrigin: null,   // populated from /api/config
   whepSessionUrl: null,
   playbackAttempt: 0,
+  streamPath: "live",
 };
 
 /* ─── DOM ─── */
@@ -264,6 +265,15 @@ function setPlaybackMode(mode) {
   if (els.modePill) els.modePill.textContent = mode === "webrtc" ? "WebRTC" : "LL-HLS";
 }
 
+function mediaUrl(suffix) {
+  const path = String(S.streamPath || "live")
+    .split("/")
+    .filter(Boolean)
+    .map(encodeURIComponent)
+    .join("/");
+  return `/${path || "live"}/${suffix}`;
+}
+
 async function connectWHEP(attempt) {
   if (!("RTCPeerConnection" in window)) {
     throw new Error("WebRTC is not supported by this browser");
@@ -324,7 +334,7 @@ async function connectWHEP(attempt) {
 
   if (attempt !== S.playbackAttempt) return;
 
-  const response = await fetch("/live/whep", {
+  const response = await fetch(mediaUrl("whep"), {
     method: "POST",
     headers: {
       "content-type": "application/sdp",
@@ -374,7 +384,7 @@ function connectHLS(attempt = S.playbackAttempt) {
   setStatus("LL-HLS yukleniyor...");
 
   const hlsBase = S.hlsOrigin ? S.hlsOrigin : "";
-  const hlsUrl = `${hlsBase}/live/index.m3u8`;
+  const hlsUrl = `${hlsBase}${mediaUrl("index.m3u8")}`;
 
   if (typeof Hls !== "undefined" && Hls.isSupported()) {
     const hls = new Hls({
@@ -504,6 +514,11 @@ async function pollStreamStatus() {
       S.hlsOrigin = d.hlsOrigin;
       console.log("[HLS] Origin set to:", S.hlsOrigin);
     }
+    if (d.streamPath && d.streamPath !== S.streamPath) {
+      S.streamPath = d.streamPath;
+      console.log("[STREAM] Path set to:", S.streamPath);
+      if (S.isLive) startPlayback();
+    }
 
     if (isOnline) {
       _offlineCount = 0; // Reset offline counter
@@ -549,6 +564,7 @@ function connectWebSocket() {
         // Do NOT use it to stop - pollStreamStatus handles offline with debounce
         if (msg.online && !S.isLive) {
           _offlineCount = 0;
+          if (msg.path) S.streamPath = msg.path;
           S.isLive = true;
           startPlayback();
         }

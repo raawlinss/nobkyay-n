@@ -79,3 +79,6 @@ paths:
   live:
     source: publisher
     maxReaders: 0
+  all_others:
+    source: publisher
+    maxReaders: 0
