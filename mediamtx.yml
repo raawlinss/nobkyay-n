@@ -51,10 +51,13 @@ webrtcLocalTCPAddress: :8189
 webrtcIPsFromInterfaces: false
 webrtcIPsFromInterfacesList: []
 webrtcAdditionalHosts: ['nobkyayin.onrender.com']
-webrtcHandshakeTimeout: 30s
+webrtcHandshakeTimeout: 60s
 webrtcTrackGatherTimeout: 8s
 webrtcSTUNGatherTimeout: 10s
 webrtcICEServers2:
+  - url: turns:openrelay.metered.ca:443
+    username: openrelayproject
+    password: openrelayproject
   - url: turn:openrelay.metered.ca:443?transport=tcp
     username: openrelayproject
     password: openrelayproject
