@@ -191,26 +191,27 @@ function handleAuthKey(req, res) {
 // MediaMTX calls this to authenticate publish/read actions
 function handleMediaMtxAuth(req, res) {
   if (req.method !== "POST") { json(res, 200, { ok: true }); return; }
-  
+
   readJson(req, 4096).then((body) => {
     console.log("MediaMTX Auth Webhook received:", body);
     const action = body.action; // "publish" or "read"
-    
+
     if (action === "publish") {
       // Accept RTMP from the local tunnel and WHIP via Bearer token.
       const user = String(body.user || "").trim();
       const password = String(body.password || "").trim();
       const token = String(body.token || "").trim();
       const query = String(body.query || "");
-      
+
       const params = new URLSearchParams(query.startsWith("?") ? query.slice(1) : query);
       const key = params.get("key") || params.get("jwt") || token || user || password;
-      
+
       let cleanedKey = key || "";
+      if (cleanedKey.toLowerCase().startsWith("bearer ")) cleanedKey = cleanedKey.slice(7);
       if (cleanedKey.startsWith("?key=")) cleanedKey = cleanedKey.replace("?key=", "");
       if (cleanedKey.includes("/")) cleanedKey = cleanedKey.split("/")[0];
       cleanedKey = cleanedKey.trim();
-      
+
       const trustedLocalRtmp = body.protocol === "rtmp" && isLocalAddress(body.ip);
 
       if (trustedLocalRtmp || cleanedKey === streamKey) {
@@ -240,7 +241,7 @@ function proxyToMediaMtx(req, res, targetHost, targetPath) {
   req.on("data", chunk => bodyChunks.push(chunk));
   req.on("end", () => {
     const body = Buffer.concat(bodyChunks);
-    
+
     // Build proxy headers - forward important ones
     const proxyHeaders = {};
     const forwardHeaders = [
@@ -270,7 +271,7 @@ function proxyToMediaMtx(req, res, targetHost, targetPath) {
         "access-control-allow-headers": "Content-Type, Authorization, If-Match",
         "access-control-expose-headers": "Location, ETag, Link, Content-Type",
       };
-      
+
       // Forward important response headers from MediaMTX
       const copyHeaders = [
         "content-type", "location", "etag", "link",
@@ -283,7 +284,7 @@ function proxyToMediaMtx(req, res, targetHost, targetPath) {
           if (h === "location" && typeof val === "string") {
             val = val.replace(`http://${targetHost}`, "");
             console.log(`[PROXY] Location Header: ${val}`);
-            
+
             // Fix: if it's relative, make it absolute using the request host
             if (val.startsWith("/")) {
               const proto = req.headers["x-forwarded-proto"] || "http";
@@ -295,7 +296,7 @@ function proxyToMediaMtx(req, res, targetHost, targetPath) {
           respHeaders[h] = val;
         }
       }
-      
+
       res.writeHead(proxyRes.statusCode, respHeaders);
       proxyRes.pipe(res);
     });
@@ -383,13 +384,13 @@ function setupWebSocket(server) {
   wss.on("connection", (ws) => {
     ws.isAlive = true;
     ws.on("pong", () => { ws.isAlive = true; });
-    ws.on("error", () => {});
+    ws.on("error", () => { });
   });
 
   rtmpWss.on("connection", (ws) => {
     ws.isAlive = true;
     ws.on("pong", () => { ws.isAlive = true; });
-    ws.on("error", () => {});
+    ws.on("error", () => { });
   });
 
   // Heartbeat
@@ -413,7 +414,7 @@ function setupWebSocket(server) {
   }, 3000);
 
   const net = require("net");
-  
+
   rtmpWss.on("connection", (ws, req) => {
     console.log("RTMP Tunnel connected from OBS");
     let wsToRtmpBytes = 0;
@@ -519,38 +520,42 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ── Stream Proxy (WHIP/WHEP/HLS) ──
-  if (pathname.startsWith("/live/")) {
-    const isWhip = pathname.endsWith("/whip") || pathname.includes("/whip/");
-    const isWhep = pathname.endsWith("/whep") || pathname.includes("/whep/");
-    const isHlsPath = /\.(m3u8|mp4|m4s|ts)$/i.test(pathname) || pathname.includes("_HLS_");
-    
-    // GET/HEAD -> HLS or Status Page
+  // ── WHIP proxy (OBS publishes here) ──
+  const isWhipPath = pathname.endsWith("/whip") || pathname.includes("/whip/");
+  const isWhepPath = pathname.endsWith("/whep") || pathname.includes("/whep/");
+  const isHlsPath = /\.(m3u8|mp4|m4s|ts)$/i.test(pathname) || pathname.includes("_HLS_");
+
+  if (isWhipPath) {
     if (req.method === "GET" || req.method === "HEAD") {
-      if (isHlsPath) {
-        proxyToMediaMtx(req, res, MEDIAMTX_HLS, pathname + requestUrl.search);
-      } else if (isWhip || isWhep) {
-        json(res, 200, {
-          status: "active",
-          service: isWhip ? "WHIP Ingest" : "WHEP Playback",
-          message: "Endpoint is active. Use a compatible client (like OBS or a WebRTC player).",
-          path: pathname
-        });
-      } else {
-        notFound(res);
-      }
+      const payload = {
+        ok: true,
+        type: "whip",
+        endpoint: pathname,
+        publish: {
+          method: "POST",
+          headers: { authorization: "Bearer <STREAM_KEY>" },
+        },
+      };
+      const body = Buffer.from(JSON.stringify(payload), "utf8");
+      res.writeHead(200, {
+        "content-type": "application/json; charset=utf-8",
+        "content-length": body.length,
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET,POST,PATCH,DELETE,OPTIONS",
+        "access-control-allow-headers": "Content-Type, Authorization, If-Match",
+      });
+      if (req.method === "HEAD") { res.end(); return; }
+      res.end(body);
       return;
     }
+    proxyToMediaMtx(req, res, MEDIAMTX_WEBRTC, pathname + requestUrl.search);
+    return;
+  }
 
-    // POST/PATCH/DELETE/OPTIONS -> WebRTC (WHIP/WHEP)
-    // Strip /whip or /whep suffixes for the initial request to match MediaMTX paths
-    let targetPath = pathname;
-    if (pathname.endsWith("/whip")) targetPath = pathname.slice(0, -5);
-    else if (pathname.endsWith("/whep")) targetPath = pathname.slice(0, -5);
-    else if (pathname.includes("/whip/")) targetPath = pathname.replace("/whip/", "/");
-    else if (pathname.includes("/whep/")) targetPath = pathname.replace("/whep/", "/");
-
-    proxyToMediaMtx(req, res, MEDIAMTX_WEBRTC, targetPath + requestUrl.search);
+  // ── WHEP proxy (viewers connect here) ──
+  if (isWhepPath) {
+    proxyToMediaMtx(req, res, MEDIAMTX_WEBRTC, pathname + requestUrl.search);
     return;
   }
 
