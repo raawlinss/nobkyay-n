@@ -1,66 +1,62 @@
-# NOBKFİLM Live — OBS Streaming Platform
+# NOBKFILM Live
 
-OBS'den doğrudan WHIP ile yayın yapıp, tarayıcıdan izlenen profesyonel canlı yayın platformu.
+OBS ayari bozulmadan sabit Render adresinden yayin:
 
-## Mimari
+https://nobkyayin.onrender.com/
+
+## Yeni mimari
 
 ```
-OBS Studio ──WHIP──→ Render.com Docker
-                      ├── MediaMTX (video+ses alır, dağıtır)
-                      ├── Node.js  (frontend, chat, proxy)
-                      └── Viewer ←──WHEP── tarayıcı
+OBS
+  -> rtmp://127.0.0.1/live
+  -> obs-tunnel.js (yerel RTMP -> WSS)
+  -> https://nobkyayin.onrender.com/rtmp-tunnel
+  -> Render icindeki MediaMTX
+  -> Izleyici: WebRTC/WHEP, olmazsa Low-Latency HLS
 ```
 
-## Render.com'a Deploy
+Cloudflare/trycloudflare linki artik yayin icin gerekli degil. `yayina-basla.bat`
+yalnizca yerel OBS RTMP cikisini Render'daki sabit siteye tasir.
 
-### 1. GitHub'a Push Et
-```bash
-git add .
-git commit -m "OBS WHIP streaming"
-git push
+## Render ayarlari
+
+Render servisinde Docker olarak deploy edin ve Environment Variables tarafinda sunu
+ayni degerle tutun:
+
+```text
+STREAM_KEY=NOBK-RAW
+PORT=7860
 ```
 
-### 2. Render.com'da Yeni Web Service Oluştur
-1. https://dashboard.render.com → **New → Web Service**
-2. GitHub repo'nu bağla
-3. Ayarlar:
-   - **Environment**: Docker
-   - **Plan**: Free (veya Starter)
-   - **Region**: Frankfurt (EU) veya en yakın
-4. **Environment Variables** ekle:
-   - `STREAM_KEY` = senin istediğin şifre (örn: `NOBK-RAW-2024`)
-   - `PORT` = `7860`
-5. **Deploy** et
+`STREAM_KEY` degerini degistirirseniz `.env.local`, Render Environment Variables
+ve yerel tunel ayni degeri kullanmali. `STREAM_ORIGIN` kullanmayin. Bu surum
+varsayilan olarak MediaMTX'i Render container icinde `127.0.0.1` uzerinden
+kullanir.
 
-### 3. OBS Ayarları
-1. OBS'yi aç → **Ayarlar → Yayın**
-2. **Hizmet**: `WHIP`
-3. **Sunucu**: `https://SENIN-APP.onrender.com/live/whip`
-4. **Bearer Token (Anahtar)**: `?key=STREAM_KEY_DEĞERIN`
-   - Örnek: `?key=NOBK-RAW-2024`
-5. **Yayını Başlat** butonuna bas
+## Yayini baslatma
 
-### 4. Admin Panel
-- Tarayıcıda `https://SENIN-APP.onrender.com/#admin` aç
-- Stream Key'i gir
-- OBS bağlantı bilgilerini göreceksin
+1. `yayina-basla.bat` dosyasini calistir.
+2. Pencere Render'in hazir oldugunu soyleyene kadar bekle.
+3. OBS ayarlari:
+   - Hizmet: `Ozel (Custom)`
+   - Sunucu: `rtmp://127.0.0.1/live`
+   - Anahtar: bos birak
+4. OBS'te `Yayini Baslat`.
+5. Izleyiciler hep `https://nobkyayin.onrender.com/` adresinden girer.
 
-### 5. İzleyiciler
-- `https://SENIN-APP.onrender.com` adresine girip izlerler
-- Ses ve video otomatik gelir (WHEP ile)
+## Gecikme notlari
 
-## Yerel Geliştirme
+- Tarayici once WebRTC/WHEP dener; Render/WebRTC agi izin vermezse otomatik
+  olarak Low-Latency HLS'e duser.
+- OBS tarafinda keyframe interval degerini `1s` yapmak HLS gecikmesini azaltir.
+- Bitrate baglantinin kaldiramayacagi kadar yuksek olursa tunel tamponu buyur ve
+  gecikme artar. Bu durumda OBS bitrate'i dusurun.
+
+## Yerel gelistirme
 
 ```bash
 npm install
 npm run dev
 ```
 
-> Not: Yerel geliştirme için MediaMTX binary'si gerekir.
-> https://github.com/bluenviron/mediamtx/releases adresinden indir.
-
-## Teknoloji Stack
-- **MediaMTX**: WHIP ingest + WHEP playback + HLS fallback
-- **Node.js**: Frontend, chat (SSE), MediaMTX proxy
-- **WebRTC**: Ultra-düşük gecikme
-- **Twitch Chat**: Embed iframe
+Yerel gelistirme icin MediaMTX binary'si gerekir.

@@ -11,7 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/styles.css?v=8" />
     <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
-    <script defer src="/app.js?v=8"></script>
+    <script defer src="/app.js?v=9"></script>
   </head>
   <body>
     <main class="app-shell" id="appShell">
@@ -117,9 +117,9 @@
 
           <!-- OBS Settings -->
           <div class="admin-obs-section">
-            <div class="admin-section-title">OBS Ayarları</div>
+            <div class="admin-section-title">OBS Tünel Ayarları</div>
             <div class="admin-field">
-              <label>WHIP URL</label>
+              <label>OBS Sunucu</label>
               <div class="admin-copy-field">
                 <input id="whipUrlField" type="text" readonly />
                 <button id="copyWhipUrl" class="source-btn" type="button" title="Kopyala">📋</button>
@@ -134,9 +134,10 @@
               </div>
             </div>
             <div class="admin-help">
-              OBS → Ayarlar → Yayın → Hizmet: <strong>WHIP</strong><br>
-              Sunucu: yukarıdaki WHIP URL<br>
-              Bearer Token: Stream Key
+              Önce bilgisayarda <strong>yayina-basla.bat</strong> açık olmalı.<br>
+              OBS → Ayarlar → Yayın → Hizmet: <strong>Özel (Custom)</strong><br>
+              Sunucu: yukarıdaki OBS Sunucu<br>
+              Yayın anahtarı: boş bırak
             </div>
           </div>
         </div>

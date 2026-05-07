@@ -9,11 +9,14 @@ const http = require("http");
 const path = require("path");
 const { WebSocketServer } = require("ws");
 
+loadLocalEnv();
+
 const PORT = Number.parseInt(process.env.PORT || "7860", 10);
-const MEDIAMTX_WEBRTC = process.env.STREAM_ORIGIN ? `${new URL(process.env.STREAM_ORIGIN).hostname}:8889` : "127.0.0.1:8889";
-const MEDIAMTX_HLS_BASE = process.env.STREAM_ORIGIN || null; // e.g. https://xxx.trycloudflare.com
-const MEDIAMTX_HLS = "127.0.0.1:8888";
-const MEDIAMTX_API = process.env.STREAM_ORIGIN ? `${new URL(process.env.STREAM_ORIGIN).hostname}:9997` : "127.0.0.1:9997";
+const MEDIAMTX_HOST = (process.env.MEDIAMTX_HOST || "127.0.0.1").trim();
+const MEDIAMTX_WEBRTC = `${MEDIAMTX_HOST}:8889`;
+const MEDIAMTX_HLS = `${MEDIAMTX_HOST}:8888`;
+const MEDIAMTX_API = `${MEDIAMTX_HOST}:9997`;
+const PUBLIC_HLS_ORIGIN = (process.env.PUBLIC_HLS_ORIGIN || "").trim() || null;
 const CHAT_LIMIT = 50;
 const PUBLIC_DIR = path.join(__dirname, "public");
 
@@ -28,6 +31,21 @@ const sseClients = new Set();
 const rateLimits = new Map();
 
 /* ─── Utility ─── */
+function loadLocalEnv() {
+  const envPath = path.join(__dirname, ".env.local");
+  if (!fs.existsSync(envPath)) return;
+  const lines = fs.readFileSync(envPath, "utf8").split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq === -1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    const value = trimmed.slice(eq + 1).trim();
+    if (key && process.env[key] === undefined) process.env[key] = value;
+  }
+}
+
 function json(res, status, body) {
   const payload = JSON.stringify(body);
   res.writeHead(status, {
@@ -79,6 +97,12 @@ function cleanNick(v) {
 
 function cleanMessage(v) {
   return String(v || "").replace(/\s+/g, " ").trim().slice(0, 220);
+}
+
+function maskSecret(v) {
+  const s = String(v || "");
+  if (s.length <= 8) return "****";
+  return `${s.slice(0, 4)}...${s.slice(-4)}`;
 }
 
 /* ─── Chat ─── */
@@ -180,11 +204,12 @@ function handleMediaMtxAuth(req, res) {
       if (cleanedKey.startsWith("?key=")) cleanedKey = cleanedKey.replace("?key=", "");
       if (cleanedKey.includes("/")) cleanedKey = cleanedKey.split("/")[0];
       
-      if (cleanedKey === streamKey) {
+      // If publisher is localhost, allow it unconditionally to avoid path mismatches in OBS
+      if (body.ip === "127.0.0.1" || body.ip === "::1" || cleanedKey === streamKey) {
         console.log("MediaMTX: publish authorized for path:", body.path);
         json(res, 200, { ok: true });
       } else {
-        console.log(`MediaMTX: publish REJECTED. Expected '${streamKey}', got '${cleanedKey}'`);
+        console.log(`MediaMTX: publish REJECTED. Expected '${maskSecret(streamKey)}', got '${maskSecret(cleanedKey)}'`);
         json(res, 401, { ok: false });
       }
     } else {
@@ -277,13 +302,8 @@ function proxyToMediaMtx(req, res, targetHost, targetPath) {
 
 /* ─── Stream Status Check ─── */
 async function checkStreamStatus() {
-  // If using external stream origin, check it via HTTP API
-  const apiHost = MEDIAMTX_HLS_BASE
-    ? `${new URL(MEDIAMTX_HLS_BASE).hostname}:9997`
-    : "127.0.0.1:9997";
-
   return new Promise((resolve) => {
-    const req = http.get(`http://${apiHost}/v3/paths/list`, (res) => {
+    const req = http.get(`http://${MEDIAMTX_API}/v3/paths/list`, (res) => {
       let data = "";
       res.on("data", chunk => data += chunk);
       res.on("end", () => {
@@ -352,13 +372,21 @@ function setupWebSocket(server) {
     ws.on("error", () => {});
   });
 
+  rtmpWss.on("connection", (ws) => {
+    ws.isAlive = true;
+    ws.on("pong", () => { ws.isAlive = true; });
+    ws.on("error", () => {});
+  });
+
   // Heartbeat
   setInterval(() => {
-    wss.clients.forEach(ws => {
-      if (!ws.isAlive) { ws.terminate(); return; }
-      ws.isAlive = false;
-      ws.ping();
-    });
+    for (const clients of [wss.clients, rtmpWss.clients]) {
+      clients.forEach(ws => {
+        if (!ws.isAlive) { ws.terminate(); return; }
+        ws.isAlive = false;
+        ws.ping();
+      });
+    }
   }, 30000);
 
   // Broadcast stream status periodically
@@ -374,30 +402,44 @@ function setupWebSocket(server) {
   
   rtmpWss.on("connection", (ws, req) => {
     console.log("RTMP Tunnel connected from OBS");
+    let wsToRtmpBytes = 0;
+    let rtmpToWsBytes = 0;
+    let closed = false;
+
+    const closeTunnel = (reason) => {
+      if (closed) return;
+      closed = true;
+      console.log(`${reason} (WS->RTMP ${wsToRtmpBytes} bytes, RTMP->WS ${rtmpToWsBytes} bytes)`);
+      if (!rtmpSocket.destroyed) rtmpSocket.end();
+      if (ws.readyState === 1) ws.close();
+    };
+
     const rtmpSocket = net.createConnection({ host: "127.0.0.1", port: 1935 }, () => {
+      rtmpSocket.setNoDelay(true);
       console.log("RTMP Tunnel established to MediaMTX");
     });
 
     rtmpSocket.on("data", (data) => {
+      rtmpToWsBytes += data.length;
       if (ws.readyState === 1) ws.send(data);
     });
 
     ws.on("message", (data) => {
+      wsToRtmpBytes += data.length;
       if (!rtmpSocket.destroyed) rtmpSocket.write(data);
     });
 
-    ws.on("close", () => {
-      console.log("RTMP Tunnel closed by OBS");
-      if (!rtmpSocket.destroyed) rtmpSocket.end();
+    ws.on("close", (code, reason) => {
+      const reasonText = reason?.toString?.() || "";
+      closeTunnel(`RTMP Tunnel closed by OBS. code=${code}${reasonText ? ` reason=${reasonText}` : ""}`);
     });
 
     rtmpSocket.on("close", () => {
-      ws.close();
+      closeTunnel("RTMP local connection closed");
     });
 
     rtmpSocket.on("error", (err) => {
-      console.error("RTMP local error:", err.message);
-      ws.close();
+      closeTunnel(`RTMP local error: ${err.message}`);
     });
   });
 
@@ -456,7 +498,8 @@ const server = http.createServer(async (req, res) => {
       viewerCount: sseClients.size,
       broadcasterOnline: status.online,
       readers: status.readers,
-      hlsOrigin: MEDIAMTX_HLS_BASE || null, // null = use same server
+      hlsOrigin: PUBLIC_HLS_ORIGIN,
+      playback: { primary: "webrtc", fallback: "hls" },
     });
     return;
   }
@@ -492,10 +535,11 @@ const server = http.createServer(async (req, res) => {
 setupWebSocket(server);
 
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`NOBKFİLM Live listening on 0.0.0.0:${PORT}`);
+  console.log(`NOBKFILM Live listening on 0.0.0.0:${PORT}`);
   console.log(`Stream Key: ${streamKey.slice(0, 6)}...`);
-  console.log(`OBS WHIP URL: https://<your-domain>/live/whip?key=${streamKey}`);
+  console.log("OBS WHIP URL: https://<your-domain>/live/whip?key=<stream-key>");
   console.log(`MediaMTX WebRTC: ${MEDIAMTX_WEBRTC}`);
+  console.log(`MediaMTX HLS: ${MEDIAMTX_HLS}`);
 });
 
 process.on("SIGTERM", () => { server.close(() => process.exit(0)); });

@@ -1,11 +1,12 @@
 {
   "name": "nobkfilm-live",
   "version": "2.0.0",
-  "description": "NOBKFİLM browser-based screen share live streaming",
+  "description": "NOBKFILM OBS live streaming bridge for Render",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "tunnel": "node obs-tunnel.js https://nobkyayin.onrender.com"
   },
   "dependencies": {
     "ws": "^8.20.0"

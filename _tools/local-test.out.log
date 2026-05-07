@@ -1,0 +1,7 @@
+NOBKFİLM Live app listening on 0.0.0.0:7872
+OBS WHIP endpoint: /live/whip
+2026/05/05 02:46:57 INF MediaMTX v1.18.1, windows, amd64
+2026/05/05 02:46:57 INF configuration loaded from C:\Users\rawnc\AppData\Local\Temp\mediamtx.yml
+2026/05/05 02:46:57 INF [HLS] listener opened on 127.0.0.1:8888 (TCP/HTTP)
+2026/05/05 02:46:57 INF [WebRTC] listener opened on 127.0.0.1:8889 (TCP/HTTP), :8189 (UDP/ICE), :8189 (TCP/ICE)
+2026/05/05 02:46:57 INF [API] listener opened on 127.0.0.1:9997 (TCP/HTTP)

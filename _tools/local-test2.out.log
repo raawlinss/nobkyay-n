@@ -1,0 +1,14 @@
+NOBKFİLM Live app listening on 0.0.0.0:7873
+OBS WHIP endpoint: /live/whip
+2026/05/05 02:47:41 INF MediaMTX v1.18.1, windows, amd64
+2026/05/05 02:47:41 INF configuration loaded from C:\Users\rawnc\AppData\Local\Temp\mediamtx.yml
+2026/05/05 02:47:41 INF [HLS] listener opened on 127.0.0.1:8888 (TCP/HTTP)
+2026/05/05 02:47:41 INF [WebRTC] listener opened on 127.0.0.1:8889 (TCP/HTTP), :8189 (UDP/ICE), :8189 (TCP/ICE)
+2026/05/05 02:47:41 INF [API] listener opened on 127.0.0.1:9997 (TCP/HTTP)
+2026/05/05 02:47:45 INF [WebRTC] [session b1acd159] created by 127.0.0.1:52323
+2026/05/05 02:47:45 INF [WebRTC] [session b1acd159] closed: no valid tracks found
+2026/05/05 02:47:45 INF [WebRTC] [session 10f409e5] created by 127.0.0.1:52323
+2026/05/05 02:47:45 INF [WebRTC] [session 10f409e5] closed: authentication failed: server replied with code 401: {"ok":false}
+2026/05/05 02:47:45 INF [WebRTC] connection 127.0.0.1:52323 failed to authenticate: server replied with code 401: {"ok":false}
+2026/05/05 02:47:47 INF [WebRTC] [session da4f2bc1] created by 127.0.0.1:52323
+2026/05/05 02:47:47 INF [WebRTC] [session da4f2bc1] closed: no stream is available on path 'live'

@@ -2,7 +2,7 @@
 # Nobk Live - MediaMTX configuration
 # OBS WHIP ingest → WHEP playback via Node.js proxy.
 
-logLevel: debug
+logLevel: info
 logDestinations: [stdout]
 readTimeout: 10s
 writeTimeout: 10s
@@ -36,9 +36,9 @@ hlsAddress: 0.0.0.0:8888
 hlsAlwaysRemux: true
 hlsVariant: lowLatency
 hlsSegmentCount: 7
-hlsSegmentDuration: 500ms
-hlsPartDuration: 100ms
-hlsSegmentMaxSize: 20M
+hlsSegmentDuration: 1s
+hlsPartDuration: 200ms
+hlsSegmentMaxSize: 50M
 hlsMuxerCloseAfter: 10s
 
 ###############################################
@@ -50,7 +50,7 @@ webrtcLocalUDPAddress: :8189
 webrtcLocalTCPAddress: :8189
 webrtcIPsFromInterfaces: false
 webrtcIPsFromInterfacesList: []
-webrtcAdditionalHosts: ['127.0.0.1']
+webrtcAdditionalHosts: ['nobkyayin.onrender.com']
 webrtcHandshakeTimeout: 30s
 webrtcTrackGatherTimeout: 8s
 webrtcSTUNGatherTimeout: 10s
