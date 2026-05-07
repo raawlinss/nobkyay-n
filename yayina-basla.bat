@@ -3,6 +3,15 @@ setlocal enabledelayedexpansion
 cd /d "%~dp0"
 
 set "RENDER_URL=https://nobkyayin.onrender.com"
+set "STREAM_KEY="
+
+if exist ".env.local" (
+    for /f "usebackq tokens=1,* delims==" %%A in (".env.local") do (
+        if /i "%%~A"=="STREAM_KEY" set "STREAM_KEY=%%~B"
+    )
+)
+
+if not defined STREAM_KEY set "STREAM_KEY=NOBK-RAW"
 
 echo.
 echo ===================================================
@@ -13,16 +22,7 @@ echo Sabit izleyici linki:
 echo   %RENDER_URL%/
 echo.
 
-echo [1/3] Eski yerel yayin parcalari temizleniyor...
-taskkill /f /im cloudflared.exe >nul 2>&1
-taskkill /f /im mediamtx.exe >nul 2>&1
-
-for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr ":1935 " ^| findstr LISTENING') do (
-    taskkill /f /pid %%a >nul 2>&1
-)
-timeout /t 1 /nobreak >nul
-
-echo [2/3] Node.js ve bagimliliklar kontrol ediliyor...
+echo [1/3] Node.js kontrol ediliyor...
 where node >nul 2>&1
 if errorlevel 1 (
     echo HATA: Node.js bulunamadi. Node.js kurulu olmali.
@@ -30,29 +30,30 @@ if errorlevel 1 (
     exit /b 1
 )
 
-if not exist "node_modules\ws\package.json" (
-    echo ws paketi eksik, npm install calistiriliyor...
-    npm install
-    if errorlevel 1 (
-        echo HATA: npm install basarisiz oldu.
-        pause
-        exit /b 1
-    )
+echo [2/3] OBS profili WHIP icin hazirlaniyor...
+node configure-obs-whip.js "%RENDER_URL%" "%STREAM_KEY%"
+if errorlevel 1 (
+    echo HATA: OBS profili guncellenemedi.
+    pause
+    exit /b 1
 )
 
-echo [3/3] Render OBS tuneli baslatiliyor...
-echo.
-echo OBS ayarlari degismiyor:
-echo   Hizmet  : Ozel (Custom)
-echo   Sunucu  : rtmp://127.0.0.1/live
-echo   Anahtar : bos birak
-echo.
-echo Bu pencereyi kapatma. OBS'te Yayini Baslat dediginde yayin
-echo dogrudan %RENDER_URL%/ sitesine aktarilacak.
-echo.
-
-node obs-tunnel.js "%RENDER_URL%"
+echo [3/3] OBS durumu kontrol ediliyor...
+tasklist /fi "imagename eq obs64.exe" | find /i "obs64.exe" >nul
+if not errorlevel 1 (
+    echo.
+    echo OBS su anda acik gorunuyor.
+    echo Degisikliklerin tam uygulanmasi icin OBS'yi kapatip yeniden ac.
+)
 
 echo.
-echo Tunel kapandi.
+echo OBS ayarlari:
+echo   Hizmet       : WHIP
+echo   Sunucu       : %RENDER_URL%/live/whip
+echo   Bearer Token : %STREAM_KEY%
+echo.
+echo Artik yerel RTMP tuneli gerekmiyor.
+echo OBS'te Yayini Baslat dediginde yayin dogrudan sabit siteye gidecek:
+echo   %RENDER_URL%/
+echo.
 pause

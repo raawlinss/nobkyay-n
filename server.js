@@ -197,25 +197,30 @@ function handleMediaMtxAuth(req, res) {
     const action = body.action; // "publish" or "read"
     
     if (action === "publish") {
-      // Check stream key from query params or user field
-      const user = body.user || "";
-      const password = body.password || "";
-      const query = body.query || "";
+      // Accept RTMP from the local tunnel and WHIP via Bearer token.
+      const user = String(body.user || "").trim();
+      const password = String(body.password || "").trim();
+      const token = String(body.token || "").trim();
+      const query = String(body.query || "");
       
-      const params = new URLSearchParams(query);
-      const key = params.get("key") || params.get("jwt") || user || password;
+      const params = new URLSearchParams(query.startsWith("?") ? query.slice(1) : query);
+      const key = params.get("key") || params.get("jwt") || token || user || password;
       
-      // Also check if they included the ?key= in the string
       let cleanedKey = key || "";
       if (cleanedKey.startsWith("?key=")) cleanedKey = cleanedKey.replace("?key=", "");
       if (cleanedKey.includes("/")) cleanedKey = cleanedKey.split("/")[0];
+      cleanedKey = cleanedKey.trim();
       
-      // RTMP is only reached through the authenticated /rtmp-tunnel inside this container.
-      if (body.protocol === "rtmp" || isLocalAddress(body.ip) || cleanedKey === streamKey) {
+      const trustedLocalRtmp = body.protocol === "rtmp" && isLocalAddress(body.ip);
+
+      if (trustedLocalRtmp || cleanedKey === streamKey) {
         console.log("MediaMTX: publish authorized for path:", body.path);
         json(res, 200, { ok: true });
       } else {
-        console.log(`MediaMTX: publish REJECTED. Expected '${maskSecret(streamKey)}', got '${maskSecret(cleanedKey)}'`);
+        console.log(
+          `MediaMTX: publish REJECTED. protocol=${body.protocol || "unknown"} ` +
+          `expected='${maskSecret(streamKey)}' got='${maskSecret(cleanedKey || token)}'`
+        );
         json(res, 401, { ok: false });
       }
     } else {
@@ -531,10 +536,6 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ── WHIP/WHEP session endpoints (ICE candidates, teardown) ──
-  if (pathname.startsWith("/live/whip/") || pathname.startsWith("/live/whep/")) {
-    proxyToMediaMtx(req, res, MEDIAMTX_WEBRTC, pathname + requestUrl.search);
-    return;
-  }
 
   // ── HLS proxy (all other /live/ paths: .m3u8, .ts, .mp4, .m4s, etc.) ──
   if (isHlsPath && !isWhipPath && !isWhepPath) {
@@ -551,7 +552,8 @@ setupWebSocket(server);
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`NOBKFILM Live listening on 0.0.0.0:${PORT}`);
   console.log(`Stream Key: ${streamKey.slice(0, 6)}...`);
-  console.log("OBS WHIP URL: https://<your-domain>/live/whip?key=<stream-key>");
+  console.log("OBS WHIP URL: https://<your-domain>/live/whip");
+  console.log("OBS Bearer Token: <stream-key>");
   console.log(`MediaMTX WebRTC: ${MEDIAMTX_WEBRTC}`);
   console.log(`MediaMTX HLS: ${MEDIAMTX_HLS}`);
 });

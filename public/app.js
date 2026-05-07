@@ -193,7 +193,7 @@ function bindUI() {
 /* ─── Admin Panel ─── */
 function showAdminPanel() {
   els.adminOverlay.removeAttribute("hidden");
-  const obsServerUrl = "rtmp://127.0.0.1/live";
+  const obsServerUrl = `${location.origin}/live/whip`;
   const whipField = $("whipUrlField");
   const keyField = $("streamKeyField");
   if (whipField) whipField.value = obsServerUrl;

@@ -1,11 +1,12 @@
 {
   "name": "nobkfilm-live",
   "version": "2.0.0",
-  "description": "NOBKFILM OBS live streaming bridge for Render",
+  "description": "NOBKFILM OBS WHIP streaming for Render",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
+    "setup-obs": "node configure-obs-whip.js https://nobkyayin.onrender.com",
     "tunnel": "node obs-tunnel.js https://nobkyayin.onrender.com"
   },
   "dependencies": {

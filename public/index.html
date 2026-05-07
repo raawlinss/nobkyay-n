@@ -9,9 +9,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/styles.css?v=8" />
+    <link rel="stylesheet" href="/styles.css?v=9" />
     <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js"></script>
-    <script defer src="/app.js?v=9"></script>
+    <script defer src="/app.js?v=10"></script>
   </head>
   <body>
     <main class="app-shell" id="appShell">
@@ -117,16 +117,16 @@
 
           <!-- OBS Settings -->
           <div class="admin-obs-section">
-            <div class="admin-section-title">OBS Tünel Ayarları</div>
+            <div class="admin-section-title">OBS WHIP Ayarlari</div>
             <div class="admin-field">
-              <label>OBS Sunucu</label>
+              <label>WHIP Sunucu</label>
               <div class="admin-copy-field">
                 <input id="whipUrlField" type="text" readonly />
                 <button id="copyWhipUrl" class="source-btn" type="button" title="Kopyala">📋</button>
               </div>
             </div>
             <div class="admin-field">
-              <label>Stream Key</label>
+              <label>Bearer Token</label>
               <div class="admin-copy-field">
                 <input id="streamKeyField" type="password" readonly />
                 <button id="copyStreamKey" class="source-btn" type="button" title="Kopyala">📋</button>
@@ -134,10 +134,11 @@
               </div>
             </div>
             <div class="admin-help">
-              Önce bilgisayarda <strong>yayina-basla.bat</strong> açık olmalı.<br>
-              OBS → Ayarlar → Yayın → Hizmet: <strong>Özel (Custom)</strong><br>
-              Sunucu: yukarıdaki OBS Sunucu<br>
-              Yayın anahtarı: boş bırak
+              <strong>yayina-basla.bat</strong> OBS profilini otomatik hazirlar.<br>
+              OBS -> Ayarlar -> Yayin -> Hizmet: <strong>WHIP</strong><br>
+              Sunucu: yukaridaki WHIP Sunucu<br>
+              Bearer Token: yukaridaki anahtar<br>
+              OBS aciksa kapatip yeniden acin.
             </div>
           </div>
         </div>

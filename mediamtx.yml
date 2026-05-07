@@ -55,15 +55,15 @@ webrtcHandshakeTimeout: 30s
 webrtcTrackGatherTimeout: 8s
 webrtcSTUNGatherTimeout: 10s
 webrtcICEServers2:
-  - url: stun:stun.l.google.com:19302
-  - url: stun:stun1.l.google.com:19302
-  - url: stun:stun2.l.google.com:19302
-  - url: turn:openrelay.metered.ca:80
-    username: openrelayproject
-    password: openrelayproject
   - url: turn:openrelay.metered.ca:443?transport=tcp
     username: openrelayproject
     password: openrelayproject
+  - url: turn:openrelay.metered.ca:80?transport=tcp
+    username: openrelayproject
+    password: openrelayproject
+  - url: stun:stun.l.google.com:19302
+  - url: stun:stun1.l.google.com:19302
+  - url: stun:stun2.l.google.com:19302
 
 ###############################################
 # Local API for health/status.
@@ -72,8 +72,8 @@ api: true
 apiAddress: 0.0.0.0:9997
 
 ###############################################
-# The public stream path. OBS publishes to /live/whip.
-# ?key=STREAM_KEY is passed as query and validated by auth webhook.
+# The public stream path. OBS publishes to /live/whip and sends
+# STREAM_KEY as the WHIP Bearer Token.
 
 paths:
   live:
